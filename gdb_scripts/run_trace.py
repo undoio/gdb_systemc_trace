@@ -43,7 +43,13 @@ except NameError:
 
 # Intermediate breakpoint at main required for dynamic linking, otherwise required systemc symbols won't be found
 bp_main = gdb.Breakpoint("main")
-gdb.execute('run')
+
+recording = argdict['recording_file'] is not None
+
+if recording:
+    gdb.execute('continue')
+else:
+    gdb.execute('run')
 bp_main.enabled = False
 
 bp_start = gdb.Breakpoint('*sc_core::sc_simcontext::prepare_to_simulate')
@@ -67,9 +73,16 @@ if list_signals:
 if run_simulation:
     if signals_file:
         signals = open(signals_file).read().splitlines()
-        design.trace_signals("systemc_trace", signals)
+        tf = design.trace_signals("systemc_trace", signals, recording=recording)
     else:
-        design.trace_all("systemc_trace")
-    gdb.execute("continue")
+        tf = design.trace_all("systemc_trace", recording=recording)
+
+    if recording:
+        try:
+            tf.collect(simctx)
+        finally:
+            tf.done()
+    else:
+        gdb.execute('continue')
 
 sys.exit(0)
